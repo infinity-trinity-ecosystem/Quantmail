@@ -78,7 +78,8 @@ export async function performLivenessCheck(
     captureSource = "capacitor_native";
   }
 
-  if (!payload || payload.length < 100) {
+  // Minimum size for a realistic base64-encoded facial image (~10 KB)
+  if (!payload || payload.length < 1000) {
     return {
       passed: false,
       livenessScore: 0,
@@ -89,7 +90,9 @@ export async function performLivenessCheck(
 
   const facialMatrixHash = deriveBiometricHash(payload);
 
-  // Entropy-based liveness heuristic: measure byte diversity in the payload
+  // Placeholder liveness heuristic: entropy-based check on the image payload.
+  // In production, replace with a real biometric SDK integration
+  // (e.g. Incode, Microblink) for actual facial feature and liveness detection.
   const sample = payload.slice(0, 2048);
   const charSet = new Set(sample.split(""));
   const entropy = charSet.size / 64; // base64 has ~64 unique chars

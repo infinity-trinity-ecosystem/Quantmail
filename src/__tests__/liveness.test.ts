@@ -21,6 +21,12 @@ describe("performLivenessCheck", () => {
     expect(result.livenessScore).toBe(0);
   });
 
+  it("should fail for payload under minimum biometric size", async () => {
+    const result = await performLivenessCheck("x".repeat(999));
+    expect(result.passed).toBe(false);
+    expect(result.livenessScore).toBe(0);
+  });
+
   it("should pass for a sufficiently entropic base64 payload", async () => {
     // Generate a realistic-looking base64 payload with high entropy
     const chars =
@@ -37,7 +43,7 @@ describe("performLivenessCheck", () => {
   });
 
   it("should fail for a low-entropy payload (all same characters)", async () => {
-    const payload = "A".repeat(500);
+    const payload = "A".repeat(2000);
     const result = await performLivenessCheck(payload);
     expect(result.passed).toBe(false);
     expect(result.livenessScore).toBeLessThan(0.7);
@@ -47,7 +53,7 @@ describe("performLivenessCheck", () => {
     const chars =
       "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
     let payload = "";
-    for (let i = 0; i < 500; i++) {
+    for (let i = 0; i < 1500; i++) {
       payload += chars[Math.floor(Math.random() * chars.length)];
     }
     const result = await performLivenessCheck(payload);
