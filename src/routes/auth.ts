@@ -17,13 +17,22 @@ export async function authRoutes(
   app: FastifyInstance,
   prisma: PrismaClient
 ): Promise<void> {
+  const authRateLimit = {
+    config: {
+      rateLimit: {
+        max: 10,
+        timeWindow: "1 minute",
+      },
+    },
+  };
+
   /**
    * POST /auth/register
    * Registers a new user with biometric liveness verification.
    */
   app.post<{
     Body: BiometricRegistrationInput;
-  }>("/auth/register", async (request, reply) => {
+  }>("/auth/register", authRateLimit, async (request, reply) => {
     const { displayName, email, imageData, captureMethod } = request.body;
 
     if (!displayName || !email || !imageData) {
@@ -89,7 +98,7 @@ export async function authRoutes(
    */
   app.post<{
     Body: { email: string; imageData: string; captureMethod: string };
-  }>("/auth/verify", async (request, reply) => {
+  }>("/auth/verify", authRateLimit, async (request, reply) => {
     const { email, imageData, captureMethod } = request.body;
 
     if (!email || !imageData) {
