@@ -10,6 +10,22 @@ import { propagateMasterIdToAll } from "../utils/masterIdPropagation";
 
 const SSO_SECRET = process.env["SSO_SECRET"] || "quantmail-dev-secret";
 
+/** Simple in-memory rate limiter for auth endpoints. */
+const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
+const RATE_LIMIT_WINDOW_MS = 60_000;
+const RATE_LIMIT_MAX = 10;
+
+function checkRateLimit(ip: string): boolean {
+  const now = Date.now();
+  const entry = rateLimitMap.get(ip);
+  if (!entry || now > entry.resetAt) {
+    rateLimitMap.set(ip, { count: 1, resetAt: now + RATE_LIMIT_WINDOW_MS });
+    return true;
+  }
+  entry.count++;
+  return entry.count <= RATE_LIMIT_MAX;
+}
+
 export async function authRoutes(app: FastifyInstance): Promise<void> {
   /**
    * POST /auth/register
@@ -98,6 +114,10 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
   app.post<{
     Body: { token: string };
   }>("/auth/verify", async (request, reply) => {
+    if (!checkRateLimit(request.ip)) {
+      return reply.code(429).send({ error: "Rate limit exceeded" });
+    }
+
     const { token } = request.body;
     if (!token) {
       return reply.code(400).send({ error: "token required" });

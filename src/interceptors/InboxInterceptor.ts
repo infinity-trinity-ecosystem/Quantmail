@@ -48,18 +48,32 @@ export function extractDomain(email: string): string {
 
 /**
  * Validates an email address format (basic check).
+ * Uses an efficient regex that avoids polynomial backtracking.
  */
 export function isValidEmail(email: string): boolean {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+  if (email.length > 254) return false;
+  const atIndex = email.lastIndexOf("@");
+  if (atIndex < 1) return false;
+  const local = email.slice(0, atIndex);
+  const domain = email.slice(atIndex + 1);
+  if (!local || !domain || domain.indexOf(".") < 1) return false;
+  if (/\s/.test(email)) return false;
+  return true;
 }
 
 /**
  * Sanitizes a message body to prevent injection attacks.
- * Strips HTML tags and limits length.
+ * Strips all HTML tags iteratively to handle nested tags, and limits length.
  */
 export function sanitizeBody(body: string): string {
-  const stripped = body.replace(/<[^>]*>/g, "");
-  return stripped.slice(0, 50000);
+  let result = body;
+  // Iteratively strip tags to handle nested/incomplete tags
+  let previous: string;
+  do {
+    previous = result;
+    result = result.replace(/<[^<>]*>/g, "");
+  } while (result !== previous);
+  return result.slice(0, 50000);
 }
 
 /**
