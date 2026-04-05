@@ -1,5 +1,9 @@
 import { FastifyInstance } from "fastify";
 import { prisma } from "../db";
+import {
+  TwinReplyBodySchema,
+  TwinConfigBodySchema,
+} from "../validation/schemas";
 
 export async function digitalTwinRoutes(app: FastifyInstance): Promise<void> {
   /**
@@ -55,13 +59,7 @@ export async function digitalTwinRoutes(app: FastifyInstance): Promise<void> {
     };
   }>("/twin/:userId/reply", async (request, reply) => {
     const { userId } = request.params;
-    const { messageId, replyBody } = request.body;
-
-    if (!messageId || !replyBody) {
-      return reply
-        .code(400)
-        .send({ error: "messageId and replyBody required" });
-    }
+    const { messageId, replyBody } = TwinReplyBodySchema.parse(request.body);
 
     const user = await prisma.user.findUnique({
       where: { id: userId },
@@ -104,7 +102,7 @@ export async function digitalTwinRoutes(app: FastifyInstance): Promise<void> {
     Body: { agentConfig: string };
   }>("/twin/:userId/config", async (request, reply) => {
     const { userId } = request.params;
-    const { agentConfig } = request.body;
+    const { agentConfig } = TwinConfigBodySchema.parse(request.body);
 
     const twin = await prisma.digitalTwin.findUnique({
       where: { userId },

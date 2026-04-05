@@ -5,63 +5,19 @@ import {
   silenceAlarmFromDashboardPhysicalLogin,
   triggerSynchronizedWebBluetoothAlarm,
 } from "../services/criticalAlarmService";
+import {
+  IotDeviceRegisterBodySchema,
+  IotAlarmTriggerBodySchema,
+  IotPhysicalLoginBodySchema,
+  IotAlarmSilenceBodySchema,
+} from "../validation/schemas";
 
 const MILLISECONDS_PER_MINUTE = 60_000;
 const MIN_PHYSICAL_SESSION_MINUTES = 1;
 const MAX_PHYSICAL_SESSION_MINUTES = 60;
-const IOT_RATE_LIMIT_WINDOW_MS = 60_000;
-const IOT_RATE_LIMIT_MAX = 20;
-const iotRateLimitMap = new Map<string, { count: number; resetAt: number }>();
-const SILENCE_RATE_LIMIT_WINDOW_MS = 60_000;
-const SILENCE_RATE_LIMIT_MAX = 10;
-const silenceRateLimitMap = new Map<
-  string,
-  { count: number; resetAt: number }
->();
 const DEVICE_PROOF_HMAC_SECRET =
   process.env["DEVICE_PROOF_HMAC_SECRET"] ||
   "quantmail-device-proof-dev-secret";
-
-function sweepExpiredRateLimitEntries(
-  now: number,
-  map: Map<string, { count: number; resetAt: number }>
-): void {
-  for (const [key, value] of map.entries()) {
-    if (now > value.resetAt) {
-      map.delete(key);
-    }
-  }
-}
-
-function checkIotRateLimit(ip: string): boolean {
-  const now = Date.now();
-  sweepExpiredRateLimitEntries(now, iotRateLimitMap);
-  const entry = iotRateLimitMap.get(ip);
-  if (!entry || now > entry.resetAt) {
-    iotRateLimitMap.set(ip, {
-      count: 1,
-      resetAt: now + IOT_RATE_LIMIT_WINDOW_MS,
-    });
-    return true;
-  }
-  entry.count++;
-  return entry.count <= IOT_RATE_LIMIT_MAX;
-}
-
-function checkSilenceRateLimit(key: string): boolean {
-  const now = Date.now();
-  sweepExpiredRateLimitEntries(now, silenceRateLimitMap);
-  const entry = silenceRateLimitMap.get(key);
-  if (!entry || now > entry.resetAt) {
-    silenceRateLimitMap.set(key, {
-      count: 1,
-      resetAt: now + SILENCE_RATE_LIMIT_WINDOW_MS,
-    });
-    return true;
-  }
-  entry.count++;
-  return entry.count <= SILENCE_RATE_LIMIT_MAX;
-}
 
 function deriveDeviceProof(
   userId: string,
@@ -101,17 +57,8 @@ export async function iotRoutes(app: FastifyInstance): Promise<void> {
       endpointRef: string;
     };
   }>("/iot/device/register", async (request, reply) => {
-    if (!checkIotRateLimit(request.ip)) {
-      return reply.code(429).send({ error: "Rate limit exceeded" });
-    }
-
     const { userId, deviceName, platform, connectionType, endpointRef } =
-      request.body;
-    if (!userId || !deviceName || !platform || !endpointRef) {
-      return reply.code(400).send({
-        error: "userId, deviceName, platform, and endpointRef required",
-      });
-    }
+      IotDeviceRegisterBodySchema.parse(request.body);
 
     const user = await prisma.user.findUnique({
       where: { id: userId },
@@ -154,22 +101,14 @@ export async function iotRoutes(app: FastifyInstance): Promise<void> {
       body: string;
     };
   }>("/iot/alarm/trigger", async (request, reply) => {
-    if (!checkIotRateLimit(request.ip)) {
-      return reply.code(429).send({ error: "Rate limit exceeded" });
-    }
-
-    const { userId, source, subject, body } = request.body;
-    if (!userId || !source || !subject) {
-      return reply
-        .code(400)
-        .send({ error: "userId, source, and subject required" });
-    }
+    const { userId, source, subject, body } =
+      IotAlarmTriggerBodySchema.parse(request.body);
 
     const alarm = await triggerSynchronizedWebBluetoothAlarm({
       userId,
       source,
       subject,
-      body: body || "",
+      body,
     });
 
     return reply.code(201).send(alarm);
@@ -188,27 +127,16 @@ export async function iotRoutes(app: FastifyInstance): Promise<void> {
       sessionMinutes?: number;
     };
   }>("/iot/dashboard/physical-login", async (request, reply) => {
-    if (!checkIotRateLimit(request.ip)) {
-      return reply.code(429).send({ error: "Rate limit exceeded" });
-    }
-
-    const { userId, dashboardOrigin, deviceProof, proofTimestamp } =
-      request.body;
-    if (!userId || !dashboardOrigin || !deviceProof || !proofTimestamp) {
-      return reply.code(400).send({
-        error:
-          "userId, dashboardOrigin, deviceProof, and proofTimestamp required",
-      });
-    }
+    const { userId, dashboardOrigin, deviceProof, proofTimestamp, sessionMinutes: rawMinutes } =
+      IotPhysicalLoginBodySchema.parse(request.body);
 
     if (!verifyDeviceProof(deviceProof, userId, dashboardOrigin, proofTimestamp)) {
       return reply.code(403).send({ error: "INVALID_DEVICE_PROOF" });
     }
 
-    const rawMinutes = request.body.sessionMinutes ?? 15;
     const sessionMinutes = Math.max(
       MIN_PHYSICAL_SESSION_MINUTES,
-      Math.min(MAX_PHYSICAL_SESSION_MINUTES, rawMinutes)
+      Math.min(MAX_PHYSICAL_SESSION_MINUTES, rawMinutes ?? 15)
     );
 
     const session = await prisma.dashboardPhysicalLogin.create({
@@ -242,22 +170,8 @@ export async function iotRoutes(app: FastifyInstance): Promise<void> {
       silenceChallenge: string;
     };
   }>("/iot/alarm/silence", async (request, reply) => {
-    if (!checkIotRateLimit(request.ip)) {
-      return reply.code(429).send({ error: "Rate limit exceeded" });
-    }
-
     const { userId, alertId, dashboardSessionId, silenceChallenge } =
-      request.body;
-    if (!userId || !alertId || !dashboardSessionId || !silenceChallenge) {
-      return reply.code(400).send({
-        error:
-          "userId, alertId, dashboardSessionId, and silenceChallenge are required",
-      });
-    }
-    const silenceKey = `${request.ip}:${userId}:${dashboardSessionId}`;
-    if (!checkSilenceRateLimit(silenceKey)) {
-      return reply.code(429).send({ error: "Rate limit exceeded" });
-    }
+      IotAlarmSilenceBodySchema.parse(request.body);
 
     const result = await silenceAlarmFromDashboardPhysicalLogin({
       userId,

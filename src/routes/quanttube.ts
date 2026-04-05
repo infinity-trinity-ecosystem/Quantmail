@@ -1,5 +1,6 @@
 import { FastifyInstance } from "fastify";
 import { prisma } from "../db";
+import { WatchHistoryBodySchema } from "../validation/schemas";
 
 export async function quanttubeRoutes(app: FastifyInstance): Promise<void> {
   /**
@@ -14,17 +15,8 @@ export async function quanttubeRoutes(app: FastifyInstance): Promise<void> {
       watchedAt?: string;
     };
   }>("/quanttube/watch-history", async (request, reply) => {
-    const { userId, videoTitle, watchedSeconds, watchedAt } = request.body;
-
-    if (!userId || !videoTitle || watchedSeconds === undefined) {
-      return reply.code(400).send({
-        error: "userId, videoTitle, and watchedSeconds required",
-      });
-    }
-
-    if (!Number.isFinite(watchedSeconds) || watchedSeconds < 0) {
-      return reply.code(400).send({ error: "watchedSeconds must be valid" });
-    }
+    const { userId, videoTitle, watchedSeconds, watchedAt } =
+      WatchHistoryBodySchema.parse(request.body);
 
     const user = await prisma.user.findUnique({
       where: { id: userId },

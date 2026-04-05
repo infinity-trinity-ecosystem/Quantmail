@@ -8,6 +8,10 @@ import {
   registerDeviceToken,
   sweepAndAggress,
 } from "../services/pushAggressor";
+import {
+  PushRegisterBodySchema,
+  PushChallengeCreateBodySchema,
+} from "../validation/schemas";
 
 export async function pushRoutes(app: FastifyInstance): Promise<void> {
   /**
@@ -17,12 +21,7 @@ export async function pushRoutes(app: FastifyInstance): Promise<void> {
   app.post<{
     Body: { userId: string; token: string; platform: string };
   }>("/push/register", async (request, reply) => {
-    const { userId, token, platform } = request.body;
-    if (!userId || !token || !platform) {
-      return reply
-        .code(400)
-        .send({ error: "userId, token, and platform required" });
-    }
+    const { userId, token, platform } = PushRegisterBodySchema.parse(request.body);
 
     const user = await prisma.user.findUnique({ where: { id: userId } });
     if (!user) {
@@ -68,11 +67,8 @@ export async function pushRoutes(app: FastifyInstance): Promise<void> {
       expiresInMinutes?: number;
     };
   }>("/push/challenge/create", async (request, reply) => {
-    const { userId, ssoToken, quantadsTarget, quantchatTitle, quantchatBody } =
-      request.body;
-    if (!userId) {
-      return reply.code(400).send({ error: "userId required" });
-    }
+    const { userId, ssoToken, quantadsTarget, quantchatTitle, quantchatBody, expiresInMinutes: expiresInMinutesRaw } =
+      PushChallengeCreateBodySchema.parse(request.body);
 
     const user = await prisma.user.findUnique({
       where: { id: userId },
@@ -82,7 +78,7 @@ export async function pushRoutes(app: FastifyInstance): Promise<void> {
       return reply.code(404).send({ error: "User not found" });
     }
 
-    const expiresInMinutes = request.body.expiresInMinutes ?? 180;
+    const expiresInMinutes = expiresInMinutesRaw ?? 180;
     const expiresAt = new Date(Date.now() + expiresInMinutes * 60_000);
 
     const challenge = await prisma.livenessChallenge.create({

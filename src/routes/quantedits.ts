@@ -18,24 +18,9 @@ import {
 import { verifyMasterSSOToken } from "../utils/crypto";
 import { v4 as uuidv4 } from "uuid";
 import CryptoJS from "crypto-js";
+import { SaccadeBodySchema } from "../validation/schemas";
 
 const SSO_SECRET = process.env["SSO_SECRET"] || "quantmail-dev-secret";
-
-/** Simple in-memory rate limiter for quantedits endpoints. */
-const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
-const RATE_LIMIT_WINDOW_MS = 60_000;
-const RATE_LIMIT_MAX = 20;
-
-function checkRateLimit(ip: string): boolean {
-  const now = Date.now();
-  const entry = rateLimitMap.get(ip);
-  if (!entry || now > entry.resetAt) {
-    rateLimitMap.set(ip, { count: 1, resetAt: now + RATE_LIMIT_WINDOW_MS });
-    return true;
-  }
-  entry.count++;
-  return entry.count <= RATE_LIMIT_MAX;
-}
 
 export async function quanteditsRoutes(app: FastifyInstance): Promise<void> {
   /**
@@ -49,16 +34,7 @@ export async function quanteditsRoutes(app: FastifyInstance): Promise<void> {
       samples: SaccadeSample[];
     };
   }>("/quantedits/saccade/record", async (request, reply) => {
-    if (!checkRateLimit(request.ip)) {
-      return reply.code(429).send({ error: "Rate limit exceeded" });
-    }
-
-    const { ssoToken, samples } = request.body;
-    if (!ssoToken || !Array.isArray(samples)) {
-      return reply
-        .code(400)
-        .send({ error: "ssoToken and samples[] required" });
-    }
+    const { ssoToken, samples } = SaccadeBodySchema.parse(request.body);
 
     const userId = verifyMasterSSOToken(ssoToken, SSO_SECRET);
     if (!userId) {
@@ -108,16 +84,7 @@ export async function quanteditsRoutes(app: FastifyInstance): Promise<void> {
       samples: SaccadeSample[];
     };
   }>("/quantedits/reel/api-key", async (request, reply) => {
-    if (!checkRateLimit(request.ip)) {
-      return reply.code(429).send({ error: "Rate limit exceeded" });
-    }
-
-    const { ssoToken, samples } = request.body;
-    if (!ssoToken || !Array.isArray(samples)) {
-      return reply
-        .code(400)
-        .send({ error: "ssoToken and samples[] required" });
-    }
+    const { ssoToken, samples } = SaccadeBodySchema.parse(request.body);
 
     const userId = verifyMasterSSOToken(ssoToken, SSO_SECRET);
     if (!userId) {

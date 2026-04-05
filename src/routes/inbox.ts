@@ -10,6 +10,7 @@ import {
   triggerSynchronizedWebBluetoothAlarm,
 } from "../services/criticalAlarmService";
 import { rankInboxMessagesByRelevance } from "../services/inboxRelevanceSync";
+import { InboxReceiveBodySchema } from "../validation/schemas";
 
 export async function inboxRoutes(app: FastifyInstance): Promise<void> {
   /**
@@ -20,13 +21,7 @@ export async function inboxRoutes(app: FastifyInstance): Promise<void> {
   app.post<{
     Body: IncomingMessage;
   }>("/inbox/receive", async (request, reply) => {
-    const message = request.body;
-
-    if (!message.senderEmail || !message.recipientEmail) {
-      return reply
-        .code(400)
-        .send({ error: "senderEmail and recipientEmail required" });
-    }
+    const message = InboxReceiveBodySchema.parse(request.body) as IncomingMessage;
 
     const result = shouldIntercept(message);
 
