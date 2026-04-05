@@ -1,6 +1,24 @@
 import type { FastifyInstance } from "fastify";
 import { prisma } from "../db";
 
+type TaskPriority = "NO_PRIORITY" | "URGENT" | "HIGH" | "MEDIUM" | "LOW";
+type TaskStatus = "BACKLOG" | "TODO" | "IN_PROGRESS" | "IN_REVIEW" | "DONE" | "CANCELLED";
+
+const VALID_PRIORITIES: TaskPriority[] = ["NO_PRIORITY", "URGENT", "HIGH", "MEDIUM", "LOW"];
+const VALID_STATUSES: TaskStatus[] = ["BACKLOG", "TODO", "IN_PROGRESS", "IN_REVIEW", "DONE", "CANCELLED"];
+
+function validatePriority(value: string | undefined): TaskPriority | undefined {
+  if (!value) return undefined;
+  if ((VALID_PRIORITIES as string[]).includes(value)) return value as TaskPriority;
+  return undefined;
+}
+
+function validateStatus(value: string | undefined): TaskStatus | undefined {
+  if (!value) return undefined;
+  if ((VALID_STATUSES as string[]).includes(value)) return value as TaskStatus;
+  return undefined;
+}
+
 export async function taskRoutes(app: FastifyInstance): Promise<void> {
   // Create a board
   app.post<{ Body: { name: string; description?: string; ownerId: string } }>(
@@ -42,6 +60,10 @@ export async function taskRoutes(app: FastifyInstance): Promise<void> {
       if (!title || !createdBy) {
         return reply.status(400).send({ error: "title and createdBy are required" });
       }
+      const resolvedPriority = validatePriority(priority);
+      if (priority && !resolvedPriority) {
+        return reply.status(400).send({ error: `Invalid priority. Must be one of: ${VALID_PRIORITIES.join(", ")}` });
+      }
       const task = await prisma.task.create({
         data: {
           boardId,
@@ -50,7 +72,7 @@ export async function taskRoutes(app: FastifyInstance): Promise<void> {
           assigneeId,
           dueDate: dueDate ? new Date(dueDate) : null,
           createdBy,
-          priority: (priority as "NO_PRIORITY" | "URGENT" | "HIGH" | "MEDIUM" | "LOW") ?? "NO_PRIORITY",
+          priority: resolvedPriority ?? "NO_PRIORITY",
         },
       });
       return reply.status(201).send({ task });
@@ -62,11 +84,19 @@ export async function taskRoutes(app: FastifyInstance): Promise<void> {
     "/api/tasks/:taskId",
     async (req, reply) => {
       const { status, priority, title, description, assigneeId } = req.body;
+      const resolvedStatus = validateStatus(status);
+      const resolvedPriority = validatePriority(priority);
+      if (status && !resolvedStatus) {
+        return reply.status(400).send({ error: `Invalid status. Must be one of: ${VALID_STATUSES.join(", ")}` });
+      }
+      if (priority && !resolvedPriority) {
+        return reply.status(400).send({ error: `Invalid priority. Must be one of: ${VALID_PRIORITIES.join(", ")}` });
+      }
       const task = await prisma.task.update({
         where: { id: req.params.taskId },
         data: {
-          ...(status && { status: status as "BACKLOG" | "TODO" | "IN_PROGRESS" | "IN_REVIEW" | "DONE" | "CANCELLED" }),
-          ...(priority && { priority: priority as "NO_PRIORITY" | "URGENT" | "HIGH" | "MEDIUM" | "LOW" }),
+          ...(resolvedStatus && { status: resolvedStatus }),
+          ...(resolvedPriority && { priority: resolvedPriority }),
           ...(title !== undefined && { title }),
           ...(description !== undefined && { description }),
           ...(assigneeId !== undefined && { assigneeId }),
