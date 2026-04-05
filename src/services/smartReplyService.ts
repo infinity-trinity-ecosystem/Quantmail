@@ -24,6 +24,14 @@ export interface SmartReplyResult {
   model: string;
 }
 
+/** Thrown when a required environment variable (e.g. OPENAI_API_KEY) is missing. */
+export class ConfigurationError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "ConfigurationError";
+  }
+}
+
 const SYSTEM_PROMPT = `You are a highly efficient executive assistant.
 Your sole task is to draft a concise, polite, and relevant email reply based
 ONLY on the email context provided by the user.
@@ -37,14 +45,15 @@ Rules:
 /**
  * Generates an AI smart reply for the given email context.
  *
- * @throws {Error} When OPENAI_API_KEY is missing or the API call fails.
+ * @throws {ConfigurationError} When OPENAI_API_KEY is missing.
+ * @throws {Error} When the API call fails or returns an unexpected response.
  */
 export async function generateSmartReply(
   request: SmartReplyRequest
 ): Promise<SmartReplyResult> {
   const apiKey = process.env["OPENAI_API_KEY"];
   if (!apiKey) {
-    throw new Error(
+    throw new ConfigurationError(
       "OPENAI_API_KEY environment variable is required but not set"
     );
   }
@@ -66,6 +75,10 @@ export async function generateSmartReply(
     max_tokens: 400,
     temperature: 0.4,
   });
+
+  if (!response.choices || response.choices.length === 0) {
+    throw new Error("OpenAI returned an empty choices array");
+  }
 
   const reply = response.choices[0]?.message?.content?.trim() ?? "";
 

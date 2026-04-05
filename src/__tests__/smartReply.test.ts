@@ -18,7 +18,7 @@ vi.mock("openai", () => {
 });
 
 // Import after mocking
-import { generateSmartReply } from "../services/smartReplyService";
+import { generateSmartReply, ConfigurationError } from "../services/smartReplyService";
 
 // ---------------------------------------------------------------------------
 // Tests for generateSmartReply
@@ -36,12 +36,12 @@ describe("generateSmartReply", () => {
     process.env = originalEnv;
   });
 
-  it("throws a clear error when OPENAI_API_KEY is missing", async () => {
+  it("throws a ConfigurationError when OPENAI_API_KEY is missing", async () => {
     delete process.env["OPENAI_API_KEY"];
 
     await expect(
       generateSmartReply({ emailContext: "Please send me the report." })
-    ).rejects.toThrow("OPENAI_API_KEY environment variable is required");
+    ).rejects.toThrow(ConfigurationError);
   });
 
   it("returns a reply with default Professional tone when no tone is given", async () => {
@@ -99,16 +99,14 @@ describe("generateSmartReply", () => {
     expect(result.reply).toBeTruthy();
   });
 
-  it("returns an empty string when the model returns no content", async () => {
+  it("throws when the model returns an empty choices array", async () => {
     process.env["OPENAI_API_KEY"] = "sk-test-key";
 
-    mockCreate.mockResolvedValue({
-      choices: [{ message: { content: null } }],
-    });
+    mockCreate.mockResolvedValue({ choices: [] });
 
-    const result = await generateSmartReply({ emailContext: "Hello?" });
-
-    expect(result.reply).toBe("");
+    await expect(
+      generateSmartReply({ emailContext: "Hello?" })
+    ).rejects.toThrow("OpenAI returned an empty choices array");
   });
 
   it("uses OPENAI_MODEL env var when set", async () => {

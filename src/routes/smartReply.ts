@@ -1,5 +1,5 @@
 import { FastifyInstance } from "fastify";
-import { generateSmartReply } from "../services/smartReplyService";
+import { generateSmartReply, ConfigurationError } from "../services/smartReplyService";
 
 export async function smartReplyRoutes(app: FastifyInstance): Promise<void> {
   /**
@@ -27,8 +27,11 @@ export async function smartReplyRoutes(app: FastifyInstance): Promise<void> {
   }>("/smart-reply/generate", async (request, reply) => {
     const { emailContext, tone } = request.body ?? {};
 
-    if (!emailContext || typeof emailContext !== "string" || emailContext.trim() === "") {
+    if (!emailContext || typeof emailContext !== "string") {
       return reply.code(400).send({ error: "emailContext is required" });
+    }
+    if (emailContext.trim() === "") {
+      return reply.code(400).send({ error: "emailContext must not be empty" });
     }
 
     try {
@@ -39,12 +42,10 @@ export async function smartReplyRoutes(app: FastifyInstance): Promise<void> {
 
       return reply.code(200).send(result);
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : String(err);
-
-      if (message.includes("OPENAI_API_KEY")) {
+      if (err instanceof ConfigurationError) {
         return reply
           .code(503)
-          .send({ error: "AI service not configured: " + message });
+          .send({ error: "AI service not configured: " + err.message });
       }
 
       app.log.error({ err }, "Smart reply generation failed");
