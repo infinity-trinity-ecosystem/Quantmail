@@ -6,3 +6,7 @@ dist/
 coverage/
 tmp/
 src/generated/
+
+# Next.js frontend
+web/.next/
+web/node_modules/
