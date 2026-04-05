@@ -155,7 +155,10 @@ export async function enqueuePushNotification(
 ): Promise<void> {
   const queue = getPushNotificationQueue();
   if (!queue) {
-    console.warn("[Queue] Push notification queue unavailable; dropping job.", data);
+    console.error(
+      "[Queue] Push notification queue unavailable (Redis not connected); job dropped.",
+      data
+    );
     return;
   }
   await queue.add("send-push", data, {

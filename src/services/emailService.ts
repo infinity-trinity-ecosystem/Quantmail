@@ -32,11 +32,16 @@ export interface EmailProvider {
 // ─── Mock Provider ────────────────────────────────────────────────
 
 /** Captures sent emails in memory; useful for tests and local development. */
+const MAX_MOCK_EMAILS = 1000;
 const sentEmails: Array<{ message: EmailMessage; sentAt: string }> = [];
 
 export const mockEmailProvider: EmailProvider = {
   async send(message: EmailMessage): Promise<EmailSendResult> {
     const entry = { message, sentAt: new Date().toISOString() };
+    // Cap the in-memory log to prevent unbounded memory growth.
+    if (sentEmails.length >= MAX_MOCK_EMAILS) {
+      sentEmails.shift();
+    }
     sentEmails.push(entry);
 
     // Emit to console so development logs show the email content.
@@ -159,7 +164,7 @@ function buildSESProvider(): EmailProvider {
       const awsSesModule = "@aws-sdk/client-ses";
       try {
         const sesModule = await (
-          import(/* @vite-ignore */ awsSesModule) as Promise<unknown>
+          import(awsSesModule) as Promise<unknown>
         ).catch(() => null);
 
         if (!sesModule) {

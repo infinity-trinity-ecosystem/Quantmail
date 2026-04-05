@@ -21,6 +21,14 @@ const VERIFY_RATE_LIMIT_MAX = 30;
 
 function checkVerifyRateLimit(ip: string): boolean {
   const now = Date.now();
+
+  // Periodically prune expired entries to prevent unbounded map growth.
+  if (verifyRateLimitMap.size > 10_000) {
+    for (const [key, val] of verifyRateLimitMap) {
+      if (val.resetAt < now) verifyRateLimitMap.delete(key);
+    }
+  }
+
   const entry = verifyRateLimitMap.get(ip);
   if (!entry || entry.resetAt < now) {
     verifyRateLimitMap.set(ip, { count: 1, resetAt: now + VERIFY_RATE_LIMIT_WINDOW_MS });
