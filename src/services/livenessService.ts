@@ -326,12 +326,26 @@ export async function performLivenessCheck(
     };
   }
 
+  // When a remote provider is explicitly configured, reject immediately if the
+  // required API key is absent rather than silently downgrading to a weaker
+  // local heuristic.
+  if (LIVENESS_PROVIDER === "incode" && !INCODE_API_KEY) {
+    throw new Error(
+      "LIVENESS_PROVIDER is set to 'incode' but INCODE_API_KEY is not configured"
+    );
+  }
+  if (LIVENESS_PROVIDER === "microblink" && !MICROBLINK_API_KEY) {
+    throw new Error(
+      "LIVENESS_PROVIDER is set to 'microblink' but MICROBLINK_API_KEY is not configured"
+    );
+  }
+
   try {
     let result: { passed: boolean; score: number; hash: string };
 
-    if (LIVENESS_PROVIDER === "incode" && INCODE_API_KEY) {
+    if (LIVENESS_PROVIDER === "incode") {
       result = await checkLivenessViaIncode(payload);
-    } else if (LIVENESS_PROVIDER === "microblink" && MICROBLINK_API_KEY) {
+    } else if (LIVENESS_PROVIDER === "microblink") {
       result = await checkLivenessViaMicroblink(payload);
     } else {
       result = checkLivenessLocally(payload);
@@ -343,15 +357,19 @@ export async function performLivenessCheck(
       facialMatrixHash: result.hash,
       captureSource,
     };
-  } catch {
-    // If the external SDK call fails, fall back to local heuristic so that a
-    // transient network error does not permanently block registration.
-    const fallback = checkLivenessLocally(payload);
-    return {
-      passed: fallback.passed,
-      livenessScore: fallback.score,
-      facialMatrixHash: fallback.hash,
-      captureSource,
-    };
+  } catch (err) {
+    // Only local mode falls back on error. Remote SDK failures surface as
+    // errors so that misconfiguration is never hidden behind a weaker check.
+    if (LIVENESS_PROVIDER === "local") {
+      console.error("[livenessService] Local check error, returning failed result:", err);
+      return {
+        passed: false,
+        livenessScore: 0,
+        facialMatrixHash: "",
+        captureSource,
+      };
+    }
+    console.error(`[livenessService] ${LIVENESS_PROVIDER} SDK error:`, err);
+    throw err;
   }
 }
