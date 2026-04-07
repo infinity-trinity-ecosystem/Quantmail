@@ -22,6 +22,8 @@ export interface ParseError {
 
 export type ParseResult = ParsedEvent | ParseError;
 
+const DEFAULT_EVENT_HOUR = 9;
+
 // ─── Time keyword maps ────────────────────────────────────────────
 
 const DAY_OFFSETS: Record<string, number> = {
@@ -130,7 +132,7 @@ export function parseEventFromText(
   const timePattern = /\b(\d{1,2})(?::(\d{2}))?\s*(am|pm|AM|PM)?\b/;
   const timeMatch = text.match(timePattern);
 
-  let hours = 9; // default 9 AM
+  let hours = DEFAULT_EVENT_HOUR;
   let minutes = 0;
 
   if (timeMatch) {

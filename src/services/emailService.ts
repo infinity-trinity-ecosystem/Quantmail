@@ -29,6 +29,8 @@ export interface EmailProvider {
   send(message: EmailMessage): Promise<EmailSendResult>;
 }
 
+const DEFAULT_FROM_EMAIL = "noreply@quantmail.app";
+
 // ─── Mock Provider ────────────────────────────────────────────────
 
 /** Captures sent emails in memory; useful for tests and local development. */
@@ -104,8 +106,7 @@ export function resolveEmailProvider(): EmailProvider {
 // ─── SendGrid Adapter ─────────────────────────────────────────────
 
 function buildSendGridProvider(apiKey: string): EmailProvider {
-  const FROM_EMAIL =
-    process.env["FROM_EMAIL"] || "noreply@quantmail.app";
+  const FROM_EMAIL = process.env["FROM_EMAIL"] || DEFAULT_FROM_EMAIL;
 
   return {
     async send(message: EmailMessage): Promise<EmailSendResult> {
@@ -182,8 +183,7 @@ function buildSESProvider(): EmailProvider {
         };
 
         const region = process.env["AWS_REGION"] || "us-east-1";
-        const fromEmail =
-          process.env["FROM_EMAIL"] || "noreply@quantmail.app";
+        const fromEmail = process.env["FROM_EMAIL"] || DEFAULT_FROM_EMAIL;
 
         const client = new SESClient({ region });
         const command = new SendEmailCommand({

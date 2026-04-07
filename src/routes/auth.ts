@@ -9,13 +9,15 @@ import {
 import { propagateMasterIdToAll } from "../utils/masterIdPropagation";
 
 const SSO_SECRET = process.env["SSO_SECRET"] || "quantmail-dev-secret";
+const AUTH_RATE_LIMIT_MAX = Number(process.env["AUTH_RATE_LIMIT_MAX"] || 5);
+const AUTH_RATE_LIMIT_WINDOW = process.env["AUTH_RATE_LIMIT_WINDOW"] || "1 minute";
 
 /** Brute-force guard: max 5 auth attempts per minute per IP. */
 const AUTH_RATE_LIMIT = {
   config: {
     rateLimit: {
-      max: 5,
-      timeWindow: "1 minute",
+      max: AUTH_RATE_LIMIT_MAX,
+      timeWindow: AUTH_RATE_LIMIT_WINDOW,
     },
   },
 };
@@ -110,8 +112,8 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
   }>("/auth/verify", {
     config: {
       rateLimit: {
-        max: 5,
-        timeWindow: "1 minute",
+        max: AUTH_RATE_LIMIT_MAX,
+        timeWindow: AUTH_RATE_LIMIT_WINDOW,
       },
     },
     handler: async (request, reply) => {
