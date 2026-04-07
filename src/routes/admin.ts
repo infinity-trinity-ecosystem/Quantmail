@@ -11,10 +11,8 @@ import { requireAdmin } from "../middleware/authMiddleware";
 import type { AuthenticatedUser } from "../middleware/authMiddleware";
 import { encryptApiKey } from "../utils/crypto";
 import { maskStoredKey } from "../utils/maskKey";
-import { createRateLimiter } from "../utils/rateLimit";
 
 const ENCRYPTION_SECRET = process.env["ENCRYPTION_SECRET"] || "quantmail-key-secret";
-const rateLimiter = createRateLimiter({ max: 10 });
 
 export async function adminRoutes(app: FastifyInstance): Promise<void> {
   app.get("/admin/stats", {
@@ -226,11 +224,13 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
     };
   }>("/admin/config", {
     preHandler: requireAdmin,
+    config: {
+      rateLimit: {
+        max: 10,
+        timeWindow: "1 minute",
+      },
+    },
     handler: async (request, reply) => {
-      if (!rateLimiter.check(request.ip)) {
-        return reply.code(429).send({ error: "Rate limit exceeded" });
-      }
-
       const requester = (request as typeof request & { user: AuthenticatedUser }).user;
       const {
         globalOpenaiKey,
@@ -281,11 +281,13 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
 
   app.get("/admin/config", {
     preHandler: requireAdmin,
+    config: {
+      rateLimit: {
+        max: 10,
+        timeWindow: "1 minute",
+      },
+    },
     handler: async (request, reply) => {
-      if (!rateLimiter.check(request.ip)) {
-        return reply.code(429).send({ error: "Rate limit exceeded" });
-      }
-
       const config = await prisma.adminConfig.findFirst({ orderBy: { updatedAt: "desc" } });
       if (!config) {
         return reply.send({

@@ -5,7 +5,7 @@ CREATE TABLE "User" (
     "email" TEXT NOT NULL,
     "biometricHash" TEXT NOT NULL,
     "verified" BOOLEAN NOT NULL DEFAULT false,
-    "role" TEXT NOT NULL DEFAULT 'USER',
+    "role" TEXT NOT NULL DEFAULT 'FREE',
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" DATETIME NOT NULL
 );

@@ -14,31 +14,6 @@ import {
 import { requireAdmin } from "../middleware/authMiddleware";
 import { prisma } from "../db";
 
-/** Simple in-memory rate limiter for the webhook verify endpoint. */
-const verifyRateLimitMap = new Map<string, { count: number; resetAt: number }>();
-const VERIFY_RATE_LIMIT_WINDOW_MS = 60_000;
-const VERIFY_RATE_LIMIT_MAX = 30;
-
-function checkVerifyRateLimit(ip: string): boolean {
-  const now = Date.now();
-
-  // Periodically prune expired entries to prevent unbounded map growth.
-  if (verifyRateLimitMap.size > 10_000) {
-    for (const [key, val] of verifyRateLimitMap) {
-      if (val.resetAt < now) verifyRateLimitMap.delete(key);
-    }
-  }
-
-  const entry = verifyRateLimitMap.get(ip);
-  if (!entry || entry.resetAt < now) {
-    verifyRateLimitMap.set(ip, { count: 1, resetAt: now + VERIFY_RATE_LIMIT_WINDOW_MS });
-    return true;
-  }
-  if (entry.count >= VERIFY_RATE_LIMIT_MAX) return false;
-  entry.count++;
-  return true;
-}
-
 export async function webhookRoutes(app: FastifyInstance): Promise<void> {
   /**
    * POST /webhooks/register
@@ -138,20 +113,16 @@ export async function webhookRoutes(app: FastifyInstance): Promise<void> {
       },
     },
     handler: async (request, reply) => {
-    if (!checkVerifyRateLimit(request.ip)) {
-      return reply.code(429).send({ error: "Rate limit exceeded" });
-    }
+      const { payload, signature, secret } = request.body;
 
-    const { payload, signature, secret } = request.body;
+      if (!payload || !signature || !secret) {
+        return reply
+          .code(400)
+          .send({ error: "payload, signature, and secret required" });
+      }
 
-    if (!payload || !signature || !secret) {
-      return reply
-        .code(400)
-        .send({ error: "payload, signature, and secret required" });
-    }
-
-    const valid = verifyWebhookSignature(payload, signature, secret);
-    return reply.send({ valid });
+      const valid = verifyWebhookSignature(payload, signature, secret);
+      return reply.send({ valid });
     },
   });
 }
