@@ -1,5 +1,9 @@
+import fs from "node:fs";
+import fs from "node:fs";
 import Fastify from "fastify";
 import cors from "@fastify/cors";
+import helmet from "@fastify/helmet";
+import rateLimit from "@fastify/rate-limit";
 import swagger from "@fastify/swagger";
 import swaggerUi from "@fastify/swagger-ui";
 import { authRoutes } from "./routes/auth";
@@ -20,7 +24,24 @@ import { driveRoutes } from "./routes/drive";
 import { meetRoutes } from "./routes/meet";
 import { prisma } from "./db";
 
+function buildHttpsOptions():
+  | { key: string; cert: string; ca?: string }
+  | undefined {
+  const keyPath = process.env["TLS_KEY_PATH"];
+  const certPath = process.env["TLS_CERT_PATH"];
+  if (!keyPath || !certPath) return undefined;
+
+  return {
+    key: fs.readFileSync(keyPath, "utf8"),
+    cert: fs.readFileSync(certPath, "utf8"),
+    ...(process.env["TLS_CA_PATH"]
+      ? { ca: fs.readFileSync(process.env["TLS_CA_PATH"], "utf8") }
+      : {}),
+  };
+}
+
 const isProduction = process.env["NODE_ENV"] === "production";
+const httpsOptions = buildHttpsOptions();
 
 const app = Fastify({
   logger: {
@@ -34,6 +55,8 @@ const app = Fastify({
           },
         }),
   },
+  bodyLimit: 1_048_576,
+  ...(httpsOptions ? { https: httpsOptions } : {}),
 });
 
 const allowedOrigins = process.env["CORS_ORIGINS"]
@@ -41,7 +64,12 @@ const allowedOrigins = process.env["CORS_ORIGINS"]
   : ["http://localhost:3000", "http://localhost:5173"];
 
 async function main(): Promise<void> {
-  // CORS – strict in production, permissive in development
+  await app.register(helmet);
+  await app.register(rateLimit, {
+    max: 200,
+    timeWindow: "1 minute",
+  });
+
   await app.register(cors, {
     origin: isProduction ? allowedOrigins : true,
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
@@ -49,7 +77,6 @@ async function main(): Promise<void> {
     credentials: true,
   });
 
-  // OpenAPI / Swagger
   await app.register(swagger, {
     openapi: {
       info: {
@@ -73,7 +100,6 @@ async function main(): Promise<void> {
     uiConfig: { docExpansion: "list", deepLinking: true },
   });
 
-  // Feature routes
   await app.register(authRoutes);
   await app.register(inboxRoutes);
   await app.register(digitalTwinRoutes);
