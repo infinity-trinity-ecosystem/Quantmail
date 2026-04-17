@@ -13,7 +13,6 @@ import { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { prisma } from "../db";
 import {
-  ALL_APP_IDS,
   AppId,
   getLeaderboard,
   getStreakState,
@@ -23,13 +22,9 @@ import {
   useShield,
 } from "../services/streakService";
 
-const APP_ID_VALUES = ALL_APP_IDS as readonly string[];
-
 const recordActivitySchema = z.object({
   userId: z.string().min(1),
-  appId: z.string().refine((v): v is AppId => APP_ID_VALUES.includes(v), {
-    message: `appId must be one of: ${APP_ID_VALUES.join(", ")}`,
-  }),
+  appId: z.nativeEnum(AppId),
   at: z
     .string()
     .datetime()
@@ -84,7 +79,7 @@ export async function streakRoutes(app: FastifyInstance): Promise<void> {
     const user = await prisma.user.findUnique({ where: { id: userId } });
     if (!user) return reply.code(404).send({ error: "USER_NOT_FOUND" });
 
-    const result = await recordActivity(userId, appId as AppId, at);
+    const result = await recordActivity(userId, appId, at);
     return reply.send(result);
   });
 

@@ -60,6 +60,9 @@ export const AMPLIFIER_MULTIPLIER = 2;
 /** Number of apps required to trigger cosmetic Trinity Mode for a day. */
 export const TRINITY_APP_COUNT = ALL_APP_IDS.length;
 
+/** Milliseconds in one UTC day. */
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
+
 // ─── Pure helpers ─────────────────────────────────────────────────
 
 /**
@@ -79,10 +82,9 @@ export function utcDateKey(at: Date): Date {
  * affect the result.
  */
 export function daysBetweenUTC(a: Date, b: Date): number {
-  const msPerDay = 24 * 60 * 60 * 1000;
   const aKey = utcDateKey(a).getTime();
   const bKey = utcDateKey(b).getTime();
-  return Math.round((bKey - aKey) / msPerDay);
+  return Math.round((bKey - aKey) / MS_PER_DAY);
 }
 
 /**
@@ -449,7 +451,7 @@ export async function recordActivity(
             data: {
               usedAt: new Date(),
               usedForDate: utcDateKey(
-                new Date(day.getTime() - 24 * 60 * 60 * 1000)
+                new Date(day.getTime() - MS_PER_DAY)
               ),
               note: "auto-consumed by streak engine",
             },
@@ -648,7 +650,7 @@ export async function rollForward(
           data: {
             usedAt: new Date(),
             usedForDate: utcDateKey(
-              new Date(day.getTime() - 24 * 60 * 60 * 1000)
+              new Date(day.getTime() - MS_PER_DAY)
             ),
             note: "auto-consumed by maintenance worker",
           },
@@ -793,7 +795,7 @@ export async function useShield(
       const gap = daysBetweenUTC(streakRow.lastActiveDate, today);
       // Yesterday was missed: the shield plugs the gap — advance the
       // anchor so tomorrow's activity continues the streak.
-      if (gap === 2 && missed.getTime() === streakRow.lastActiveDate.getTime() + 24 * 60 * 60 * 1000) {
+      if (gap === 2 && missed.getTime() === streakRow.lastActiveDate.getTime() + MS_PER_DAY) {
         await tx.userStreak.update({
           where: { userId },
           data: {

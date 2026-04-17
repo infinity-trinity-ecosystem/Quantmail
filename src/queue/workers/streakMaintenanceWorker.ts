@@ -36,6 +36,9 @@ const CONCURRENCY = parseInt(
   10
 );
 
+/** Milliseconds in one UTC day. */
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
+
 /** Users with any activity in the last N days are considered "active". */
 const ACTIVE_USER_WINDOW_DAYS = parseInt(
   process.env["STREAK_ACTIVE_USER_WINDOW_DAYS"] || "30",
@@ -63,7 +66,7 @@ async function resolveTargetUsers(
   if (data.userIds && data.userIds.length > 0) return data.userIds;
 
   const windowStart = utcDateKey(
-    new Date(today.getTime() - ACTIVE_USER_WINDOW_DAYS * 24 * 60 * 60 * 1000)
+    new Date(today.getTime() - ACTIVE_USER_WINDOW_DAYS * MS_PER_DAY)
   );
 
   const [recent, withStreak] = await Promise.all([
