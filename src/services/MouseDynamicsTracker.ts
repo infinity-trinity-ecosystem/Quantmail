@@ -88,8 +88,16 @@ export const MouseConstants = Object.freeze({
   MIN_WINDOW_EVENTS: 40,
   /** Recommended comparison cadence (ms). */
   COMPARE_INTERVAL_MS: 10_000,
-  /** Maximum pixels/ms considered humanly possible — above this is "teleport". */
-  MAX_PLAUSIBLE_VELOCITY_PX_MS: 12,
+  /**
+   * Maximum pixels/ms considered humanly possible. Anything above this
+   * is treated as a "teleport" (bot / scripted cursor warp / remote-
+   * control). Empirical studies of mouse movement (Accot & Zhai 1997;
+   * MacKenzie 1992) put peak sustained human cursor velocity around
+   * 3-4 px/ms with short spikes up to ~6 px/ms on large displays. A
+   * cap of 8 px/ms gives comfortable headroom for very fast users on
+   * high-DPI monitors while still flagging obviously-synthetic jumps.
+   */
+  MAX_PLAUSIBLE_VELOCITY_PX_MS: 8,
   /** Distance threshold (pixels) for a single-step teleport check. */
   TELEPORT_JUMP_PX: 900,
   /** Dt below this + big jump → teleport. */
