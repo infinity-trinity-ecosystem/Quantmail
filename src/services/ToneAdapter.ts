@@ -417,7 +417,7 @@ const URGENT_MARKERS: string[] = [
 const APOLOGETIC_OPENERS: string[] = [
   "I sincerely apologize for the delay",
   "My apologies for any inconvenience caused",
-  "I take full responsibility for this oversight",
+  "I am sorry for this oversight and take full responsibility",
 ];
 
 /**
